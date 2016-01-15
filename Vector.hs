@@ -22,7 +22,7 @@ module Vector (
 
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality ((:~:)(Refl))
-import Data.List ((++), genericReplicate, genericLength, elemIndex, genericIndex)
+import Data.List ((++), genericReplicate, genericLength, elemIndex, genericIndex, genericTake)
 import Data.Array
 import Data.Function (($))
 import Data.Functor
@@ -34,15 +34,13 @@ import Control.Monad
 
 import GHC.TypeLits
 
-import PromotableList
-
 type role Vector nominal representational
-data Vector (n :: Nat) a= Vector (PromotableList a)
+data Vector (n :: Nat) a = Vector [a]
 
 vector :: forall n a. KnownNat n => [a] -> Vector n a
 vector xs = let len = natVal (Proxy :: Proxy n)
             in if len == genericLength xs
-               then Vector (fromList xs)
+               then Vector xs
                else error "Vector must be initialized with the correct number of elements!"
 
 -- | A vector's size. Useful so you don't have to do proxy-mangling in *your* code.
@@ -55,17 +53,17 @@ zipV = zipWithV (,)
 
 -- | ZipWith, duh
 zipWithV :: KnownNat n => (a -> b -> c) -> Vector n a -> Vector n b -> Vector n c
-zipWithV f (Vector xs) (Vector ys) = Vector $ f <$> xs <*> ys
+zipWithV f (Vector xs) (Vector ys) = Vector $ getZipList $ f <$> ZipList xs <*> ZipList ys
 
 
 -- | Repeat a value n times.
 repeatV :: forall n a. KnownNat n => a -> Vector n a
-repeatV = Vector . takeP (natVal (Proxy :: Proxy n)) . pure
+repeatV = Vector . genericTake (natVal (Proxy :: Proxy n)) . pure
 
 (!@) :: (KnownNat n, Integral i) => Vector n a -> i -> a
-vec !@ i | inRange (0, sizeV vec) i' = indexP ls i'
-         where i' = toInteger i
-               Vector ls = vec
+v@(Vector vec) !@ i | 0 <= i' && i' <= sizeV v
+                    = genericIndex vec i'
+     where i' = toInteger i
 
 instance (KnownNat n, Show a) => Show (Vector n a) where
     show v = show (sizeV v) ++ show (toList v)
@@ -89,7 +87,7 @@ instance Traversable (Vector n) where
 -- Note: this is the ZipList-like instance, which means there's no monad. This is as far as we can go.
 instance KnownNat n => Applicative (Vector n) where
     pure = repeatV
-    (Vector fs) <*> (Vector xs) = Vector $ fs <*> xs
+    (<*>) = zipWithV ($)
 
 instance (KnownNat n, Eq a) => Eq (Vector n a) where
     v1 == v2 = and $ zipWithV (==) v1 v2

@@ -1,7 +1,9 @@
 {-# LANGUAGE
     RecordWildCards,
     ExplicitNamespaces,
-    PolyKinds
+    PolyKinds,
+    DataKinds,
+    ScopedTypeVariables
     #-}
 
 module ZipperN (
@@ -13,6 +15,7 @@ import Data.List
 import Data.Functor
 import Data.Foldable
 import Data.Traversable
+import Data.Proxy
 
 import Control.Applicative
 import Control.Comonad
@@ -21,11 +24,14 @@ import GHC.TypeLits
 
 import Vector
 
-data ZipperN (maxIndex :: Vector n Nat) a = ZipperN {
+data ZipperN (n :: Nat) a = ZipperN {
     _pos :: !(Vector n Integer),
     _max :: !(Vector n Integer),
     _arr :: (Array (Vector n Integer) a)
     }
+
+dimension :: KnownNat n => ZipperN n a -> Integer
+dimension (z :: ZipperN n a) = natVal (Proxy :: Proxy n)
 
 -- | Smart constructor
 zipper :: KnownNat n => Vector n Integer -> [(Vector n Integer, a)] -> ZipperN n a
